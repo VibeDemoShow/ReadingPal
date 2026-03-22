@@ -1,11 +1,14 @@
-// Global app state context
+// Global app state context — uses generic StorageProvider via ProviderContext
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { LearningState, initLearningState, updateFamiliarity, markStoryRead, getProgress } from './learning';
 import { Story } from './ai';
-import { UserProfile, loadProfile, saveProfile, loadLearningState, saveLearningState, loadStories, saveStories, addStory } from './storage';
+import { UserProfile } from './providers/types';
+import { useProvider } from './providers/ProviderContext';
 import { getWordsForGrade, Word } from './wordBank';
+import { AuthUser } from './providers/types';
 
 interface AppState {
+  user: AuthUser | null;
   profile: UserProfile | null;
   learningState: LearningState;
   stories: Story[];
@@ -15,6 +18,7 @@ interface AppState {
 }
 
 type Action =
+  | { type: 'SET_USER'; user: AuthUser | null }
   | { type: 'SET_PROFILE'; profile: UserProfile }
   | { type: 'SET_LEARNING_STATE'; state: LearningState }
   | { type: 'SET_STORIES'; stories: Story[] }
@@ -23,10 +27,13 @@ type Action =
   | { type: 'ANSWER_QUIZ'; wordId: string; correct: boolean }
   | { type: 'MARK_STORY_READ'; wordIds: string[] }
   | { type: 'SET_LOADING'; loading: boolean }
-  | { type: 'SET_WORDS'; words: Word[] };
+  | { type: 'SET_WORDS'; words: Word[] }
+  | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'SET_USER':
+      return { ...state, user: action.user };
     case 'SET_PROFILE':
       return { ...state, profile: action.profile };
     case 'SET_LEARNING_STATE':
@@ -49,12 +56,15 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, isLoading: action.loading };
     case 'SET_WORDS':
       return { ...state, allWords: action.words };
+    case 'RESET':
+      return initialState;
     default:
       return state;
   }
 }
 
 const initialState: AppState = {
+  user: null,
   profile: null,
   learningState: initLearningState(1),
   stories: [],
@@ -77,34 +87,59 @@ const AppContext = createContext<AppContextType>({
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { auth, storage } = useProvider();
 
-  // Load data on mount
+  // Listen for auth state changes and load user data
   useEffect(() => {
-    (async () => {
-      try {
-        const profile = await loadProfile();
-        const gradeLevel = profile?.gradeLevel ?? 1;
-        const learningState = await loadLearningState(gradeLevel);
-        const stories = await loadStories();
-        const words = getWordsForGrade(gradeLevel);
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      dispatch({ type: 'SET_USER', user });
 
-        if (profile) dispatch({ type: 'SET_PROFILE', profile });
-        dispatch({ type: 'SET_LEARNING_STATE', state: learningState });
-        dispatch({ type: 'SET_STORIES', stories });
-        dispatch({ type: 'SET_WORDS', words });
-      } catch (error) {
-        console.error('Error loading app data:', error);
-      } finally {
-        dispatch({ type: 'SET_LOADING', loading: false });
+      if (user) {
+        try {
+          const gradeLevel = user.gradeLevel ?? 1;
+          const profile = await storage.loadProfile(user.uid);
+          const learningState = await storage.loadLearningState(user.uid, gradeLevel);
+          const stories = await storage.loadStories(user.uid);
+          const words = getWordsForGrade(gradeLevel);
+
+          if (profile) {
+            dispatch({ type: 'SET_PROFILE', profile });
+          } else {
+            // Create profile from auth user
+            const newProfile: UserProfile = {
+              displayName: user.displayName,
+              gradeLevel,
+              createdAt: new Date().toISOString(),
+            };
+            await storage.saveProfile(user.uid, newProfile);
+            dispatch({ type: 'SET_PROFILE', profile: newProfile });
+          }
+
+          dispatch({ type: 'SET_LEARNING_STATE', state: learningState });
+          dispatch({ type: 'SET_STORIES', stories });
+          dispatch({ type: 'SET_WORDS', words });
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      } else {
+        // User logged out — reset state
+        dispatch({ type: 'RESET' });
       }
-    })();
-  }, []);
 
-  // Auto-save when learning state changes
+      dispatch({ type: 'SET_LOADING', loading: false });
+    });
+
+    return unsubscribe;
+  }, [auth, storage]);
+
+  // Save state to storage
   const saveState = async () => {
+    if (!state.user) return;
     try {
-      await saveLearningState(state.learningState);
-      if (state.profile) await saveProfile(state.profile);
+      await storage.saveLearningState(state.user.uid, state.learningState);
+      if (state.profile) {
+        await storage.saveProfile(state.user.uid, state.profile);
+      }
     } catch (error) {
       console.error('Error saving state:', error);
     }

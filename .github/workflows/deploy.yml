@@ -32,13 +32,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Export Web
-        run: npx expo export -p web
+      # Build SQLite version (uses AsyncStorage fallback on web)
+      - name: Build SQLite version
+        env:
+          EXPO_PUBLIC_BACKEND: sqlite
+        run: |
+          npx expo export -p web
+          mkdir -p combined-dist/ReadingPal
+          cp -r dist/* combined-dist/ReadingPal/
+          rm -rf dist
+
+      # Build Supabase version
+      - name: Build Supabase version
+        env:
+          EXPO_PUBLIC_BACKEND: supabase
+        run: |
+          # Temporarily change baseUrl for supabase build
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            config.expo.experiments.baseUrl = '/ReadingPal/cloud';
+            fs.writeFileSync('app.json', JSON.stringify(config, null, 2));
+          "
+          npx expo export -p web
+          mkdir -p combined-dist/ReadingPal/cloud
+          cp -r dist/* combined-dist/ReadingPal/cloud/
+          rm -rf dist
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./combined-dist
 
   deploy:
     needs: build

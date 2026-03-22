@@ -73,6 +73,45 @@ Currently, the app uses beautiful "mock stories" so you can test the UI immediat
 
 ---
 
+## 5. Switching Between Backends (SQLite vs Supabase)
+
+ReadingPal supports two storage backends. You control which one to use with the `EXPO_PUBLIC_BACKEND` environment variable.
+
+| Value | What it does |
+|-------|-------------|
+| `sqlite` (default) | Stores data locally on the device. On **native** (iOS/Android), uses SQLite. On **web**, falls back to AsyncStorage (browser storage). |
+| `supabase` | Stores data in the cloud via Supabase. Syncs across devices. *(Coming soon — stubs are in place)* |
+
+### Running locally with a specific backend
+
+```bash
+# Local/offline mode (default)
+EXPO_PUBLIC_BACKEND=sqlite npx expo start
+
+# Cloud mode (once Supabase is set up)
+EXPO_PUBLIC_BACKEND=supabase npx expo start
+```
+
+On **Windows PowerShell**, set the variable first:
+```powershell
+$env:EXPO_PUBLIC_BACKEND="sqlite"
+npx expo start
+```
+
+### GitHub Pages deployment
+
+The GitHub Actions workflow automatically builds and deploys **both** versions:
+
+| URL | Backend |
+|-----|---------|
+| `https://<you>.github.io/ReadingPal/` | SQLite / AsyncStorage (local) |
+| `https://<you>.github.io/ReadingPal/cloud/` | Supabase (cloud) |
+
+> [!NOTE]
+> If you don't set `EXPO_PUBLIC_BACKEND`, the app defaults to `sqlite`. No configuration is needed for the local-only version.
+
+---
+
 ## Troubleshooting
 
 - **`npx` is not recognized (Windows)**: You must close your current terminal (click the trash can icon) and open a new one (Terminal > New Terminal). If it *still* doesn't work, close VS Code entirely and reopen it. Or to fix instantly in your current window, run: `$env:Path += ";C:\Program Files\nodejs"`

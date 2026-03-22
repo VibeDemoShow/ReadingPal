@@ -11,7 +11,6 @@ import {
 import { useRouter } from 'expo-router';
 import { AppColors } from '@/constants/Colors';
 import { useAppContext } from '@/lib/AppContext';
-import { saveLearningState } from '@/lib/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -167,7 +166,7 @@ export default function QuizScreen() {
         <View style={styles.resultsButtons}>
           <TouchableOpacity
             style={styles.newStoryButton}
-            onPress={() => router.push('/(tabs)/')}
+            onPress={() => router.push('/(tabs)')}
           >
             <Text style={styles.newStoryText}>📖 Read Another Story</Text>
           </TouchableOpacity>

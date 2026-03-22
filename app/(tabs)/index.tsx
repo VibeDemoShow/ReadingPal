@@ -13,14 +13,14 @@ import { AppColors } from '@/constants/Colors';
 import { useAppContext, getProgress } from '@/lib/AppContext';
 import { selectTargetWords } from '@/lib/learning';
 import { generateStory } from '@/lib/ai';
-import { addStory } from '@/lib/storage';
-import { saveLearningState } from '@/lib/storage';
 import { getStarMilestones } from '@/lib/learning';
+import { useProvider } from '@/lib/providers/ProviderContext';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { state, dispatch, saveState } = useAppContext();
+  const { storage } = useProvider();
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [bounceAnim] = useState(new Animated.Value(1));
@@ -61,7 +61,9 @@ export default function HomeScreen() {
 
       dispatch({ type: 'ADD_STORY', story });
       dispatch({ type: 'MARK_STORY_READ', wordIds: targetWords.map(w => w.id) });
-      await addStory(story);
+      if (state.user) {
+        await storage.addStory(state.user.uid, story);
+      }
       await saveState();
 
       router.push('/(tabs)/read');

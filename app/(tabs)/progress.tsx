@@ -5,14 +5,21 @@ import {
   Text,
   ScrollView,
   Animated,
+  TouchableOpacity,
+  Alert,
+  Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { AppColors } from '@/constants/Colors';
 import { useAppContext, getProgress } from '@/lib/AppContext';
 import { getStarMilestones } from '@/lib/learning';
 import { WORD_BANK } from '@/lib/wordBank';
+import { useProvider } from '@/lib/providers/ProviderContext';
 
 export default function ProgressScreen() {
   const { state } = useAppContext();
+  const { auth } = useProvider();
+  const router = useRouter();
   const progress = getProgress(state.learningState);
   const milestones = getStarMilestones(progress.totalStars);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -169,6 +176,36 @@ export default function ProgressScreen() {
             )}
           </View>
         )}
+
+        {/* Logout */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => {
+              const doLogout = async () => {
+                await auth.logout();
+                router.replace('/login' as any);
+              };
+              if (Platform.OS === 'web') {
+                doLogout();
+              } else {
+                Alert.alert(
+                  'Log Out',
+                  'Are you sure you want to log out?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Log Out', style: 'destructive', onPress: doLogout },
+                  ]
+                );
+              }
+            }}
+          >
+            <Text style={styles.logoutText}>🚪 Log Out</Text>
+          </TouchableOpacity>
+          <Text style={styles.logoutHint}>
+            Logged in as {state.user?.displayName || 'Guest'}
+          </Text>
+        </View>
       </Animated.View>
     </ScrollView>
   );
@@ -352,5 +389,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  logoutSection: {
+    marginTop: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    backgroundColor: AppColors.surface,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: AppColors.error,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: AppColors.error,
+  },
+  logoutHint: {
+    fontSize: 12,
+    color: AppColors.textLight,
+    marginTop: 8,
   },
 });
