@@ -21,6 +21,7 @@ export default function ReadScreen() {
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState(0.85);
+  const [activeCharIndex, setActiveCharIndex] = useState<number | null>(null);
   const [selectedWord, setSelectedWord] = useState<{ text: string; definition: string; example: string } | null>(null);
   const [showWordModal, setShowWordModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -39,15 +40,28 @@ export default function ReadScreen() {
     if (isSpeaking) {
       Speech.stop();
       setIsSpeaking(false);
+      setActiveCharIndex(null);
       return;
     }
 
     setIsSpeaking(true);
+    setActiveCharIndex(null);
     Speech.speak(story.content, {
       rate: speechRate,
       language: 'en-US',
-      onDone: () => setIsSpeaking(false),
-      onStopped: () => setIsSpeaking(false),
+      onBoundary: (ev: any) => {
+        if (ev && typeof ev.charIndex === 'number') {
+          setActiveCharIndex(ev.charIndex);
+        }
+      },
+      onDone: () => {
+        setIsSpeaking(false);
+        setActiveCharIndex(null);
+      },
+      onStopped: () => {
+        setIsSpeaking(false);
+        setActiveCharIndex(null);
+      },
     });
   }, [story, isSpeaking, speechRate]);
 
@@ -71,25 +85,36 @@ export default function ReadScreen() {
     const words = story.content.split(/(\s+)/);
     const targetWordTexts = story.targetWords.map(w => w.text.toLowerCase());
 
+    let runningIndex = 0;
+    const wordElements = words.map((w, i) => {
+      const startIndex = runningIndex;
+      const endIndex = startIndex + w.length;
+      runningIndex = endIndex;
+
+      const cleanWord = w.toLowerCase().replace(/[^a-zA-Z]/g, '');
+      const isTarget = !!cleanWord && targetWordTexts.includes(cleanWord);
+      
+      const isSpoken = activeCharIndex !== null && activeCharIndex >= startIndex && activeCharIndex < endIndex;
+
+      const wordStyle = [
+        isTarget && styles.highlightedWord,
+        isSpoken && styles.spokenWord,
+      ];
+
+      return (
+        <Text
+          key={i}
+          style={wordStyle.length > 0 ? wordStyle : undefined}
+          onPress={isTarget ? () => handleWordTap(w) : undefined}
+        >
+          {w}
+        </Text>
+      );
+    });
+
     return (
       <Text style={styles.storyText}>
-        {words.map((w, i) => {
-          const cleanWord = w.toLowerCase().replace(/[^a-zA-Z]/g, '');
-          const isTarget = targetWordTexts.includes(cleanWord);
-
-          if (isTarget) {
-            return (
-              <Text
-                key={i}
-                style={styles.highlightedWord}
-                onPress={() => handleWordTap(w)}
-              >
-                {w}
-              </Text>
-            );
-          }
-          return <Text key={i}>{w}</Text>;
-        })}
+        {wordElements}
       </Text>
     );
   };
@@ -353,6 +378,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     borderRadius: 4,
     paddingHorizontal: 2,
+    overflow: 'hidden',
+  },
+  spokenWord: {
+    backgroundColor: AppColors.primary,
+    color: '#ffffff',
+    fontWeight: '700',
+    borderRadius: 4,
+    paddingHorizontal: 2,
+    overflow: 'hidden',
   },
   wordListSection: {
     marginBottom: 20,
