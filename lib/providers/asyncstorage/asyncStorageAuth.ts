@@ -13,6 +13,7 @@ function generateUid(): string {
 
 interface StoredUser {
   uid: string;
+  username?: string;
   displayName: string;
   gradeLevel: number;
   pin: string;
@@ -40,11 +41,11 @@ export const asyncStorageAuth: AuthProvider = {
   async login(credentials: Record<string, string>): Promise<AuthUser> {
     const { name, pin } = credentials;
     if (!name || !pin) {
-      throw new Error('Name and PIN are required');
+      throw new Error('Username and PIN are required');
     }
 
     const users = await getUsers();
-    const found = users.find(u => u.displayName === name.trim());
+    const found = users.find(u => (u.username || u.displayName) === name.trim());
 
     if (!found) {
       throw new Error('User not found. Please sign up first.');
@@ -55,6 +56,7 @@ export const asyncStorageAuth: AuthProvider = {
 
     const user: AuthUser = {
       uid: found.uid,
+      username: found.username || found.displayName,
       displayName: found.displayName,
       gradeLevel: found.gradeLevel,
     };
@@ -65,14 +67,17 @@ export const asyncStorageAuth: AuthProvider = {
   },
 
   async signup(credentials: Record<string, string>): Promise<AuthUser> {
-    const { name, gradeLevel, pin } = credentials;
-    if (!name || !pin) {
-      throw new Error('Name and PIN are required');
+    const { username, displayName, gradeLevel, pin } = credentials;
+    if (!username || !pin) {
+      throw new Error('Username and PIN are required');
     }
 
+    const cleanUsername = username.trim();
+    const finalDisplayName = (displayName || username).trim();
+
     const users = await getUsers();
-    if (users.find(u => u.displayName === name.trim())) {
-      throw new Error('A user with this name already exists. Please log in or use a different name.');
+    if (users.find(u => (u.username || u.displayName) === cleanUsername)) {
+      throw new Error('A user with this username already exists. Please log in or use a different username.');
     }
 
     const uid = generateUid();
@@ -80,7 +85,8 @@ export const asyncStorageAuth: AuthProvider = {
 
     const newUser: StoredUser = {
       uid,
-      displayName: name.trim(),
+      username: cleanUsername,
+      displayName: finalDisplayName,
       gradeLevel: grade,
       pin,
       createdAt: new Date().toISOString(),
@@ -89,7 +95,7 @@ export const asyncStorageAuth: AuthProvider = {
     users.push(newUser);
     await saveUsers(users);
 
-    const user: AuthUser = { uid, displayName: name.trim(), gradeLevel: grade };
+    const user: AuthUser = { uid, username: cleanUsername, displayName: finalDisplayName, gradeLevel: grade };
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user));
     notifyListeners(user);
     return user;
@@ -109,6 +115,42 @@ export const asyncStorageAuth: AuthProvider = {
       await AsyncStorage.removeItem(SESSION_KEY);
       return null;
     }
+  },
+
+  async updateUser(uid: string, updates: Partial<AuthUser>): Promise<AuthUser> {
+    const users = await getUsers();
+    const userIndex = users.findIndex(u => u.uid === uid);
+    
+    if (userIndex === -1) {
+      throw new Error('User not found.');
+    }
+
+    const user = users[userIndex];
+    const { displayName = user.displayName, gradeLevel = user.gradeLevel } = updates;
+    const newName = displayName.trim();
+
+    users[userIndex] = { ...user, displayName: newName, gradeLevel };
+    await saveUsers(users);
+
+    const updatedUser: AuthUser = { 
+      uid, 
+      username: user.username || user.displayName, 
+      displayName: newName, 
+      gradeLevel 
+    };
+
+    const currentSession = await AsyncStorage.getItem(SESSION_KEY);
+    if (currentSession) {
+      try {
+        const currentUser: AuthUser = JSON.parse(currentSession);
+        if (currentUser.uid === uid) {
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+          notifyListeners(updatedUser);
+        }
+      } catch {}
+    }
+
+    return updatedUser;
   },
 
   onAuthStateChanged(callback: (user: AuthUser | null) => void): () => void {

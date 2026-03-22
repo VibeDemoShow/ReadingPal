@@ -21,7 +21,8 @@ type Tab = 'login' | 'signup';
 export default function LoginScreen() {
   const { auth } = useProvider();
   const [activeTab, setActiveTab] = useState<Tab>('login');
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
   const [gradeLevel, setGradeLevel] = useState(1);
   const [error, setError] = useState('');
@@ -42,10 +43,10 @@ export default function LoginScreen() {
 
     try {
       if (activeTab === 'login') {
-        await auth.login({ name: name.trim(), pin });
+        await auth.login({ name: username.trim(), pin });
       } else {
-        if (!name.trim()) {
-          setError('Please enter your name');
+        if (!username.trim()) {
+          setError('Please enter your username');
           setIsLoading(false);
           return;
         }
@@ -55,7 +56,8 @@ export default function LoginScreen() {
           return;
         }
         await auth.signup({
-          name: name.trim(),
+          username: username.trim(),
+          displayName: displayName.trim(),
           gradeLevel: gradeLevel.toString(),
           pin,
         });
@@ -106,19 +108,35 @@ export default function LoginScreen() {
 
           {/* Form card */}
           <View style={styles.card}>
-            {/* Name input */}
+            {/* Username input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>👤 Your Name</Text>
+              <Text style={styles.label}>👤 Username</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your name"
+                placeholder="Enter your username"
                 placeholderTextColor={AppColors.textLight}
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
                 autoCorrect={false}
               />
             </View>
+
+            {/* Display Name input (sign up only) */}
+            {activeTab === 'signup' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>✨ Display Name (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="What should we call you?"
+                  placeholderTextColor={AppColors.textLight}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+            )}
 
             {/* PIN input */}
             <View style={styles.inputGroup}>

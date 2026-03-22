@@ -1,10 +1,9 @@
 import React from 'react';
-import { Tabs, useRouter } from 'expo-router';
-import { Platform, Text, View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Platform, Text, View, StyleSheet } from 'react-native';
 
 import { AppColors } from '@/constants/Colors';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useProvider } from '@/lib/providers/ProviderContext';
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
@@ -15,31 +14,6 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
-  const { auth } = useProvider();
-  const router = useRouter();
-
-  const handleLogout = () => {
-    const doLogout = async () => {
-      await auth.logout();
-      router.replace('/login' as any);
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to log out?')) {
-        doLogout();
-      }
-    } else {
-      Alert.alert(
-        'Log Out',
-        'Are you sure you want to log out?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Log Out', style: 'destructive', onPress: doLogout },
-        ]
-      );
-    }
-  };
-
   return (
     <Tabs
       screenOptions={{
@@ -109,24 +83,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="logout"
+        name="profile"
         options={{
-          title: 'Log Out',
-          tabBarIcon: () => <TabIcon emoji="🚪" focused={false} />,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '600',
-            color: AppColors.error,
-          },
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={props.style as any}
-              accessibilityRole="button"
-            >
-              {props.children}
-            </TouchableOpacity>
-          ),
+          title: 'Profile',
+          headerTitle: '👤 My Profile',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
         }}
       />
     </Tabs>

@@ -7,12 +7,14 @@ import { Story } from '../ai';
 // Authenticated user identity
 export interface AuthUser {
   uid: string;
+  username: string;
   displayName: string;
   gradeLevel: number;
 }
 
 // User profile stored in the database
 export interface UserProfile {
+  username: string;
   displayName: string;
   gradeLevel: number;
   createdAt: string;
@@ -39,6 +41,9 @@ export interface AuthProvider {
 
   /** Get the currently logged-in user, or null */
   getCurrentUser(): Promise<AuthUser | null>;
+
+  /** Update current user's profile information (e.g. name, grade) */
+  updateUser(uid: string, updates: Partial<AuthUser>): Promise<AuthUser>;
 
   /**
    * Subscribe to auth state changes.

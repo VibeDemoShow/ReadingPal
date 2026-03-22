@@ -12,10 +12,16 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS profiles (
         uid TEXT PRIMARY KEY,
+        username TEXT,
         displayName TEXT NOT NULL,
         gradeLevel INTEGER NOT NULL DEFAULT 1,
         createdAt TEXT NOT NULL
       );
+
+      try {
+        await db.execAsync('ALTER TABLE profiles ADD COLUMN username TEXT;');
+        await db.execAsync('UPDATE profiles SET username = displayName WHERE username IS NULL;');
+      } catch (e) {}
 
       CREATE TABLE IF NOT EXISTS learning_states (
         uid TEXT PRIMARY KEY,
@@ -40,21 +46,23 @@ export const sqliteStorage: StorageProvider = {
   async saveProfile(uid: string, profile: UserProfile): Promise<void> {
     const database = await getDb();
     await database.runAsync(
-      `INSERT OR REPLACE INTO profiles (uid, displayName, gradeLevel, createdAt) VALUES (?, ?, ?, ?)`,
-      [uid, profile.displayName, profile.gradeLevel, profile.createdAt]
+      `INSERT OR REPLACE INTO profiles (uid, username, displayName, gradeLevel, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      [uid, profile.username, profile.displayName, profile.gradeLevel, profile.createdAt]
     );
   },
 
   async loadProfile(uid: string): Promise<UserProfile | null> {
     const database = await getDb();
     const row = await database.getFirstAsync<{
+      username: string;
       displayName: string;
       gradeLevel: number;
       createdAt: string;
-    }>('SELECT displayName, gradeLevel, createdAt FROM profiles WHERE uid = ?', [uid]);
+    }>('SELECT username, displayName, gradeLevel, createdAt FROM profiles WHERE uid = ?', [uid]);
 
     if (!row) return null;
     return {
+      username: row.username,
       displayName: row.displayName,
       gradeLevel: row.gradeLevel,
       createdAt: row.createdAt,

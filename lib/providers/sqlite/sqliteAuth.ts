@@ -13,12 +13,21 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS users (
         uid TEXT PRIMARY KEY,
+        username TEXT UNIQUE,
         displayName TEXT NOT NULL,
         gradeLevel INTEGER NOT NULL DEFAULT 1,
         pin TEXT NOT NULL,
         createdAt TEXT NOT NULL
       );
     `);
+    
+    // Quick migration for existing dev tables
+    try {
+      await db.execAsync('ALTER TABLE users ADD COLUMN username TEXT;');
+      await db.execAsync('UPDATE users SET username = displayName WHERE username IS NULL;');
+    } catch (e) {
+      // Column might already exist
+    }
   }
   return db;
 }
@@ -46,11 +55,12 @@ export const sqliteAuth: AuthProvider = {
     const database = await getDb();
     const row = await database.getFirstAsync<{
       uid: string;
+      username: string;
       displayName: string;
       gradeLevel: number;
       pin: string;
     }>(
-      'SELECT uid, displayName, gradeLevel, pin FROM users WHERE displayName = ?',
+      'SELECT uid, username, displayName, gradeLevel, pin FROM users WHERE username = ?',
       [name.trim()]
     );
 
@@ -64,6 +74,7 @@ export const sqliteAuth: AuthProvider = {
 
     const user: AuthUser = {
       uid: row.uid,
+      username: row.username,
       displayName: row.displayName,
       gradeLevel: row.gradeLevel,
     };
@@ -75,20 +86,24 @@ export const sqliteAuth: AuthProvider = {
   },
 
   async signup(credentials: Record<string, string>): Promise<AuthUser> {
-    const { name, gradeLevel, pin } = credentials;
-    if (!name || !pin) {
-      throw new Error('Name and PIN are required');
+    const { username, displayName, gradeLevel, pin } = credentials;
+    if (!username || !pin) {
+      throw new Error('Username and PIN are required');
     }
+
+    // Default display name to username if not provided
+    const finalDisplayName = (displayName || username).trim();
+    const cleanUsername = username.trim();
 
     const database = await getDb();
 
-    // Check if name already exists
+    // Check if username already exists
     const existing = await database.getFirstAsync<{ uid: string }>(
-      'SELECT uid FROM users WHERE displayName = ?',
-      [name.trim()]
+      'SELECT uid FROM users WHERE username = ?',
+      [cleanUsername]
     );
     if (existing) {
-      throw new Error('A user with this name already exists. Please log in or use a different name.');
+      throw new Error('A user with this username already exists. Please log in or use a different username.');
     }
 
     const uid = generateUid();
@@ -96,13 +111,14 @@ export const sqliteAuth: AuthProvider = {
     const createdAt = new Date().toISOString();
 
     await database.runAsync(
-      'INSERT INTO users (uid, displayName, gradeLevel, pin, createdAt) VALUES (?, ?, ?, ?, ?)',
-      [uid, name.trim(), grade, pin, createdAt]
+      'INSERT INTO users (uid, username, displayName, gradeLevel, pin, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, cleanUsername, finalDisplayName, grade, pin, createdAt]
     );
 
     const user: AuthUser = {
       uid,
-      displayName: name.trim(),
+      username: cleanUsername,
+      displayName: finalDisplayName,
       gradeLevel: grade,
     };
 
@@ -138,6 +154,46 @@ export const sqliteAuth: AuthProvider = {
       await AsyncStorage.removeItem(SESSION_KEY);
       return null;
     }
+  },
+
+  async updateUser(uid: string, updates: Partial<AuthUser>): Promise<AuthUser> {
+    const database = await getDb();
+    
+    // First, verify the user exists
+    const user = await database.getFirstAsync<{
+      uid: string;
+      username: string;
+      displayName: string;
+      gradeLevel: number;
+    }>('SELECT uid, username, displayName, gradeLevel FROM users WHERE uid = ?', [uid]);
+
+    if (!user) {
+      throw new Error('User not found.');
+    }
+
+    const { displayName = user.displayName, gradeLevel = user.gradeLevel } = updates;
+    const newName = displayName.trim();
+
+    await database.runAsync(
+      'UPDATE users SET displayName = ?, gradeLevel = ? WHERE uid = ?',
+      [newName, gradeLevel, uid]
+    );
+
+    const updatedUser: AuthUser = { uid, username: user.username, displayName: newName, gradeLevel };
+    
+    // Only update session if it's the currently logged-in user
+    const currentSession = await AsyncStorage.getItem(SESSION_KEY);
+    if (currentSession) {
+      try {
+        const currentUser: AuthUser = JSON.parse(currentSession);
+        if (currentUser.uid === uid) {
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+          notifyListeners(updatedUser);
+        }
+      } catch {}
+    }
+
+    return updatedUser;
   },
 
   onAuthStateChanged(callback: (user: AuthUser | null) => void): () => void {

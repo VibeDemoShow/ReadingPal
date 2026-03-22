@@ -32,6 +32,11 @@ export const supabaseAuth: AuthProvider = {
     return null;
   },
 
+  async updateUser(_uid: string, _updates: Partial<AuthUser>): Promise<AuthUser> {
+    // TODO: implement Supabase profile updates
+    throw new Error('Supabase auth not yet implemented');
+  },
+
   onAuthStateChanged(_callback: (user: AuthUser | null) => void): () => void {
     // TODO: const { data: { subscription } } = supabase.auth.onAuthStateChange(...)
     return () => {};

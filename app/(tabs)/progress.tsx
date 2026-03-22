@@ -177,35 +177,7 @@ export default function ProgressScreen() {
           </View>
         )}
 
-        {/* Logout */}
-        <View style={styles.logoutSection}>
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => {
-              const doLogout = async () => {
-                await auth.logout();
-                router.replace('/login' as any);
-              };
-              if (Platform.OS === 'web') {
-                doLogout();
-              } else {
-                Alert.alert(
-                  'Log Out',
-                  'Are you sure you want to log out?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Log Out', style: 'destructive', onPress: doLogout },
-                  ]
-                );
-              }
-            }}
-          >
-            <Text style={styles.logoutText}>🚪 Log Out</Text>
-          </TouchableOpacity>
-          <Text style={styles.logoutHint}>
-            Logged in as {state.user?.displayName || 'Guest'}
-          </Text>
-        </View>
+
       </Animated.View>
     </ScrollView>
   );
@@ -389,35 +361,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
-  },
-  logoutSection: {
-    marginTop: 32,
-    marginBottom: 32,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-    paddingTop: 24,
-  },
-  logoutButton: {
-    backgroundColor: AppColors.error,
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    width: '100%',
-    shadowColor: AppColors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoutText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  logoutHint: {
-    fontSize: 14,
-    color: AppColors.textSecondary,
-    marginTop: 10,
   },
 });
