@@ -26,6 +26,28 @@ export default function ReadScreen() {
   const [showWordModal, setShowWordModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  const [voices, setVoices] = useState<Speech.Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<Speech.Voice | null>(null);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        const availableVoices = await Speech.getAvailableVoicesAsync();
+        const englishVoices = availableVoices.filter(v => v.language.startsWith('en'));
+        setVoices(englishVoices);
+        if (englishVoices.length > 0) {
+          // Try to find a high-quality enhanced voice first, otherwise use the first one
+          const premiumVoice = englishVoices.find(v => v.quality === 'Enhanced' || v.identifier.includes('Premium'));
+          setSelectedVoice(premiumVoice || englishVoices[0]);
+        }
+      } catch (err) {
+        console.warn("Could not fetch voices: ", err);
+      }
+    };
+    fetchVoices();
+  }, []);
+
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -49,6 +71,7 @@ export default function ReadScreen() {
     Speech.speak(story.content, {
       rate: speechRate,
       language: 'en-US',
+      voice: selectedVoice?.identifier,
       onBoundary: (ev: any) => {
         if (ev && typeof ev.charIndex === 'number') {
           setActiveCharIndex(ev.charIndex);
@@ -174,6 +197,18 @@ export default function ReadScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            
+            <View style={styles.voiceControls}>
+              <Text style={styles.speedLabel}>Voice:</Text>
+              <TouchableOpacity
+                style={styles.voiceSelector}
+                onPress={() => setShowVoiceModal(true)}
+              >
+                <Text style={styles.voiceSelectorText} numberOfLines={1}>
+                  {selectedVoice ? selectedVoice.name : 'Loading...'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Story content */}
@@ -237,6 +272,54 @@ export default function ReadScreen() {
               onPress={() => setShowWordModal(false)}
             >
               <Text style={styles.modalCloseText}>Got it! 👍</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Voice Selection Modal */}
+      <Modal
+        visible={showVoiceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowVoiceModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowVoiceModal(false)}
+        >
+          <View style={[styles.modalContent, styles.voiceModalContent]}>
+            <Text style={styles.modalWord}>Choose a Voice</Text>
+            <View style={styles.modalDivider} />
+            <ScrollView style={styles.voiceListContainer}>
+              {voices.map(voice => (
+                <TouchableOpacity
+                  key={voice.identifier}
+                  style={[
+                    styles.voiceOption,
+                    selectedVoice?.identifier === voice.identifier && styles.voiceOptionSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedVoice(voice);
+                    setShowVoiceModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.voiceOptionText,
+                    selectedVoice?.identifier === voice.identifier && styles.voiceOptionTextSelected
+                  ]}>
+                    {voice.name}
+                  </Text>
+                  <Text style={styles.voiceOptionSubtext}>{voice.quality}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.modalClose, { marginTop: 16 }]}
+              onPress={() => setShowVoiceModal(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -491,5 +574,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
+  },
+  voiceControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    marginTop: 12,
+  },
+  voiceSelector: {
+    flex: 1,
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  voiceSelectorText: {
+    fontSize: 14,
+    color: AppColors.textPrimary,
+    fontWeight: '500',
+  },
+  voiceModalContent: {
+    maxHeight: '80%',
+  },
+  voiceListContainer: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  voiceOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: AppColors.background,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  voiceOptionSelected: {
+    borderColor: AppColors.primary,
+    backgroundColor: AppColors.surfaceElevated,
+  },
+  voiceOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: AppColors.textPrimary,
+  },
+  voiceOptionTextSelected: {
+    color: AppColors.primary,
+  },
+  voiceOptionSubtext: {
+    fontSize: 12,
+    color: AppColors.textSecondary,
+    marginTop: 4,
   },
 });
