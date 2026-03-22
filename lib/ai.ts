@@ -110,6 +110,13 @@ Respond ONLY with valid JSON in this exact format:
 
   const parsed = JSON.parse(text);
 
+  let illustrationUrl: string | undefined = undefined;
+  try {
+    illustrationUrl = await generateIllustrationWithGemini(parsed.title, gradeLevel);
+  } catch (err) {
+    console.warn("Illustration generation failed", err);
+  }
+
   return {
     id: `story_${Date.now()}`,
     title: parsed.title,
@@ -123,8 +130,45 @@ Respond ONLY with valid JSON in this exact format:
       options: q.options,
       correctIndex: q.correctIndex,
     })),
+    illustrationUrl,
     createdAt: new Date().toISOString(),
   };
+}
+
+async function generateIllustrationWithGemini(promptTitle: string, gradeLevel: number): Promise<string | undefined> {
+  const gradeLabel = gradeLevel === 0 ? 'kindergarten' : `grade ${gradeLevel}`;
+  const imagePrompt = `A high-quality, colorful, and cheerful storybook illustration for a ${gradeLabel} children's story titled "${promptTitle}". The art style should be 2D, vibrant, friendly, soft, and highly suitable for a cute kids' book.`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-images:predict?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt: imagePrompt }],
+          parameters: {
+            sampleCount: 1,
+            outputOptions: { mimeType: 'image/jpeg' },
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`Imagen API error: ${response.status}`);
+      return undefined;
+    }
+
+    const data = await response.json();
+    const base64 = data.predictions?.[0]?.bytesBase64Encoded;
+    if (base64) {
+      return `data:image/jpeg;base64,${base64}`;
+    }
+  } catch (err) {
+    console.warn('Failed to generate illustration with Imagen:', err);
+  }
+  return undefined;
 }
 
 // Mock story generator for development (no API key needed)
@@ -155,6 +199,7 @@ function generateMockStory(targetWords: Word[], gradeLevel: number): Story {
     ...story,
     targetWords,
     quizQuestions,
+    illustrationUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&q=80',
     createdAt: new Date().toISOString(),
   };
 }

@@ -8,6 +8,7 @@ import {
   Modal,
   Animated,
   Platform,
+  Image,
 } from 'react-native';
 import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
@@ -158,9 +159,17 @@ export default function ReadScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Story illustration placeholder */}
+          {/* Story illustration */}
           <View style={styles.illustrationContainer}>
-            <Text style={styles.illustrationEmoji}>📖✨</Text>
+            {story.illustrationUrl ? (
+              <Image 
+                source={{ uri: story.illustrationUrl }} 
+                style={styles.illustrationImage} 
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.illustrationEmoji}>📖✨</Text>
+            )}
           </View>
 
           {/* Title */}
@@ -367,6 +376,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: AppColors.border,
+    overflow: 'hidden',
+  },
+  illustrationImage: {
+    width: '100%',
+    height: '100%',
   },
   illustrationEmoji: {
     fontSize: 64,
